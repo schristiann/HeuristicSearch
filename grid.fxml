@@ -7,11 +7,11 @@
 <?import javafx.scene.control.Button?>
 <AnchorPane prefHeight="400.0" prefWidth="600.0" xmlns="http://javafx.com/javafx/8.0.121" xmlns:fx="http://javafx.com/fxml/1" fx:controller="view.GridController">
     <GridPane fx:id="main" prefHeight="313.0" prefWidth="600.0" >
-    <GridPane fx:id="grid" prefHeight="313.0" prefWidth="600.0" GridPane.rowIndex="1" GridPane.columnIndex="1"/>
+    <GridPane fx:id="grid" prefHeight="313.0" prefWidth="600.0" GridPane.rowIndex="1" GridPane.columnIndex="2"/>
     <ButtonBar prefHeight="40.0" prefWidth="200.0" GridPane.columnIndex="1" GridPane.rowIndex="2" >
         <buttons>
             <Button fx:id="searchButton" mnemonicParsing="false" onAction="#doSearch" text="Search" />
-            <Button fx:id="reloadButton" mnemonicParsing="false" onAction="#doReload" text="Reload" />
+            <Button fx:id="reloadButton" mnemonicParsing="false" onAction="#doRestart" text="Restart" />
 
         </buttons>
     </ButtonBar>
