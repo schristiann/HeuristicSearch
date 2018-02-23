@@ -3,6 +3,7 @@ package view;
 import javafx.event.EventHandler;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
+import javafx.scene.control.Alert;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.GridPane;
 
@@ -57,9 +58,8 @@ public class GridController {
             for (int col = 0; col < colNum; col++) {
                 int n = rand.nextInt(4);
                 Rectangle rec = new Rectangle();
-                //make smaller for more squares seen, larger for smaller grids
-                rec.setWidth(6);
-                rec.setHeight(6);
+                rec.setWidth(30);
+                rec.setHeight(30);
 
 //                int val = random.nextInt(max - min + 1) + min;
 
@@ -111,15 +111,31 @@ public class GridController {
 
     }
 
+    private void displayMessage(String title, String text) {
+        Alert alert = new Alert(Alert.AlertType.ERROR);
+
+        alert.setTitle(title);
+        alert.setHeaderText("");
+        alert.setContentText(text);
+        alert.showAndWait();
+    }
     @FXML
     public void doSearch() {
         System.out.println("Starting search");
-        searchGrid();
+
+        if (startPos == null || targetPos == null) {
+
+            displayMessage("Missing Input", "Starting and ending position must be selected before searching" );
+
+        }
+        else {
+            searchGrid();
+        }
     }
 
     @FXML
-    public void doReload() {
-        System.out.println("Doing reload");
+    public void doRestart() {
+        System.out.println("Doing restart");
         startPos = null;
         targetPos = null;
         routeStack.clear();
@@ -127,8 +143,16 @@ public class GridController {
         openList = new BinaryHeap<>();
         for (int row = 0; row < gridSize; row++) {
             for (int col = 0; col < gridSize; col++) {
+                State s = array[row][col];
+                s.prevPos = null;
+                s.f = 0;
+                s.g = Integer.MAX_VALUE;
+                s.h = 0;
+                s.priority = 0;
                 Rectangle rec1 = (Rectangle) getNodeFromGridPane(row, col);
-                if (rec1.getFill().equals(Color.GREEN))
+                if (rec1.getFill().equals(Color.GREEN)
+                        || rec1.getFill().equals(Color.RED)
+                        || rec1.getFill().equals(Color.BLUE))
                  rec1.setFill(Color.TRANSPARENT);
             }
         }
@@ -269,16 +293,24 @@ public class GridController {
 
         State start = array[startPos.row][startPos.col];
 
+        State target = array[targetPos.row][targetPos.col];
+
+        start.g = 0;
+        target.g = Integer.MAX_VALUE;
+        start.h = getDistance(targetPos, new Pos(startPos.row, startPos.col));
+        start.f = start.g + start.h;
+
         openList.add(start);
         Pos currentPos = startPos;
 
-        Pos pos = getNextState(currentPos, targetPos);
+        Pos pos = getNextState();
 
         int counter = 0;
-        while (!openList.isEmpty()) {
+        boolean listIsEmpty = openList.isEmpty();
+        while (!listIsEmpty) {
             while (!pos.equals(targetPos)) {
-                currentPos = pos;
-                pos = getNextState(currentPos, targetPos);
+
+                pos = getNextState();
                 if (pos == null) {
                     System.out.println("Cannot find next position");
                     break;
@@ -288,19 +320,25 @@ public class GridController {
                 System.out.println("I reached the target");
                 break;
             }
-            if (! openList.isEmpty()) {
-                State s = openList.remove();
+            if (!openList.isEmpty()) {
+                State s = openList.peek();
+                System.out.println("Peeked: " + s + " from openList");
                 pos = s.pos;
+            } else {
+                listIsEmpty = true;
             }
         }
 
-        if (openList.isEmpty())
+        if (openList.isEmpty()) {
             System.out.println("I cannot reach the target");
+        displayMessage("Target not found", "Target cannot be reached");
+        }
         else {
             // go back from goal to target
 
             State s = array[pos.row][pos.col];
 
+            int pathCount = 0;
             while (s.prevPos != null) {
                 System.out.println(s.pos);
                 routeStack.push(s.pos);
@@ -308,6 +346,11 @@ public class GridController {
                 if (s.pos.equals(start.pos)) {
                     System.out.println(s.pos);
                     routeStack.push(s.pos);
+                    break;
+                }
+                pathCount++;
+                if (pathCount > totalCells) {
+                    System.out.println("Problem displaying route");
                     break;
                 }
             }
@@ -324,13 +367,19 @@ public class GridController {
         }
     }
 
-    private Pos getNextState(Pos currentPos, Pos targetPos) {
+    private Pos getNextState() {
 
-        State currentState = array[currentPos.row][currentPos.col];
-        State targetState = array[targetPos.row][targetPos.col];
+
+        if (openList.isEmpty()) {   // should not happen
+            return null;
+        }
+
+        State currentState = openList.remove();
+        Pos currentPos = currentState.pos;
+        System.out.println("Removed: " + currentState + " from openList");
+
 
         closedMap.put(currentPos, currentState);
-
         List<State> stateList = new ArrayList<State>();
 
         // get col distance
@@ -348,7 +397,7 @@ public class GridController {
         if (isOpen(row, east)) {
             eastState = array[row][east];
             eastDistance = getDistance(targetPos, new Pos(row, east));
-            eastState.g = getDistance(startPos, new Pos(row, east));
+            eastState.g = currentState.g + 1; //getDistance(startPos, new Pos(row, east));
             eastState.h = eastDistance;
             eastState.f = eastState.g + eastState.h;
 //            eastState.open = true;
@@ -359,14 +408,16 @@ public class GridController {
                 eastState.priority--;
             }
             stateList.add(eastState);
+
             openList.add(eastState);
+//            System.out.println("Setting eastState.prePos to " + currentPos);
             eastState.prevPos = currentPos;
         }
 
         if (isOpen(row, west)) {
             westState = array[row][west];
             westDistance = getDistance(targetPos, new Pos(row, west));
-            westState.g = getDistance(startPos, new Pos(row, west));
+            westState.g = currentState.g + 1; //getDistance(startPos, new Pos(row, west));
             westState.h = westDistance;
 //            westState.open = true;
             westState.f = westState.g + westState.h;
@@ -377,13 +428,14 @@ public class GridController {
             }
             stateList.add(westState);
             openList.add(westState);
+//            System.out.println("Setting westState.prePos to " + currentPos);
             westState.prevPos = currentPos;
         }
 
         if (isOpen(south, col)) {
             southState = array[south][col];
             southDistance = getDistance(targetPos, new Pos(south, col));
-            southState.g = getDistance(startPos, new Pos(south, col));
+            southState.g = currentState.g + 1; //getDistance(startPos, new Pos(south, col));
             southState.h = southDistance;
 //            southState.open = true;
             southState.f = southState.g + southState.h;
@@ -394,13 +446,14 @@ public class GridController {
             }
             stateList.add(southState);
             openList.add(southState);
+//            System.out.println("Setting southState.prePos to " + currentPos);
             southState.prevPos = currentPos;
         }
 
         if (isOpen(north, col)) {
             northState = array[north][col];
             northDistance = getDistance(targetPos, new Pos(north, col));
-            northState.g = getDistance(startPos, new Pos(north, col));
+            northState.g = currentState.g + 1; //getDistance(startPos, new Pos(north, col));
             northState.h = northDistance;
 //            northState.open = true;
             northState.f = northState.h + northState.g;
@@ -412,6 +465,7 @@ public class GridController {
 
             stateList.add(northState);
             openList.add(northState);
+//            System.out.println("Setting northState.prePos to " + currentPos);
             northState.prevPos = currentPos;
         }
 
@@ -427,6 +481,7 @@ public class GridController {
         State nextState = null;
         if (!stateList.isEmpty()) {
             nextState = stateList.get(0);
+            nextState.g = 0;
 
 //            openList.add(nextState);
 
@@ -434,7 +489,7 @@ public class GridController {
 //            System.out.println(openList.toString());
         }
 
-        openList.remove();
+
         return (nextState != null) ? nextState.pos : null;
     }
 
