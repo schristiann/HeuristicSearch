@@ -58,8 +58,8 @@ public class GridController {
             for (int col = 0; col < colNum; col++) {
                 int n = rand.nextInt(4);
                 Rectangle rec = new Rectangle();
-                rec.setWidth(30);
-                rec.setHeight(30);
+                rec.setWidth(8);
+                rec.setHeight(8);
 
 //                int val = random.nextInt(max - min + 1) + min;
 
