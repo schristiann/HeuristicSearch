@@ -6,22 +6,42 @@ import javafx.scene.Node;
 import javafx.scene.control.Alert;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.GridPane;
-
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.PrintStream;
+import java.nio.file.Files;
 import java.util.*;
 import java.util.stream.Collectors;
 
 import static java.util.Comparator.comparing;
 
 public class GridController {
-
+	public enum SortType{FORWARD, BACKWARD, ADAPTIVE}
+	
+	int newPath=0;
+	
+	State start=null;
+	
+	SortType sortType=null;
+	
     Pos startPos;
     Pos targetPos;
     Map<Pos, State> closedMap = new HashMap<>();
     BinaryHeap<State> openList = new BinaryHeap<>();
-    Stack<Pos> routeStack = new Stack<>();
+    List<Pos> routeList = new ArrayList<>();
+    private Map<Pos, State> blockedMap = new HashMap<>();
+    
+
+//
+//    String states = "0,0,0:0,1,0:0,2,0:0,3,0:0,4,0:"
+//            + "1,0,0:1,1,0:1,2,1:1,3,0:1,4,0:"
+//            + "2,0,0:2,1,0:2,2,1:2,3,1:2,4,0:"
+//            + "3,0,0:3,1,0:3,2,1:3,3,1:3,4,0:"
+//            + "4,0,0:4,1,0:4,2,0:4,3,1:4,4,0";
 
     @FXML
     GridPane grid;
@@ -33,20 +53,80 @@ public class GridController {
     int initCount  = 0;
     int gridSize = 0;
 
-    public void makeGrid(int size){
+
+    public void loadGridFromFile(File file) {
+
+        try {
+            byte[] data = Files.readAllBytes(file.toPath());
+            if (data.length == 0) {
+                throw new IOException("Input file is empty");
+            }
+            String gridInfo = new String(data);
 
 
-        totalCells = size * size;
-        array = new State[size][size];
+            String[] cellStates = gridInfo.split(":");
 
-        gridSize = size;
-        initArray(size);
+            gridSize = (int) Math.sqrt(cellStates.length);
+            totalCells = gridSize * gridSize;
+            System.out.println("Creating grid of size " + gridSize + "x" + gridSize);
+            array = new State[gridSize][gridSize];
 
-        setArrayValues(size);
+            for (String cellState: cellStates) {
+                String[] values = cellState.split(",");
+                int r = Integer.valueOf(values[0]);
+                int c = Integer.valueOf(values[1]);
+
+                int s = Integer.valueOf(values[2]);
+                State state = new State(0,0, (s ==0 ) ? State.CellState.OPEN : State.CellState.BLOCKED, new Pos(r,c));
+
+                array[r][c] = state;
+//            state.cellState = (s ==0 ) ? State.CellState.OPEN : State.CellState.BLOCKED;
+//
+//            state.pos = new Pos(r,c);
+            }
+        }
+        catch (IOException ioe) {
+            displayMessage("Error", "Cannot open file " + file.getAbsolutePath());
+            System.exit(1);
+        }
+
+    }
+
+    public void makeGrid(int defaultSize){
+
+        File file = new File("./gridinfo.txt");
+
+        if ( file.exists() && file.length() > 0) {
+            loadGridFromFile(file);
+        }
+
+        else {
+            totalCells = defaultSize * defaultSize;
+            array = new State[defaultSize][defaultSize];
+
+            gridSize = defaultSize;
+        initArray(defaultSize);
+
+        setArrayValues(defaultSize);
+
+
+        }
+
+        int recSize = 30;
+
+        if (array.length > 5)
+            recSize = 15;
+        if (array.length > 30)
+            recSize = 10;
+
+        if (array.length > 50)
+            recSize = 8;
+        if (array.length > 70)
+            recSize = 6;
 
         int closed = 0, open = 0;
         int min = 0, max = 9;
-        int rowNum = size, colNum = size;
+        int rowNum = array.length, colNum = array.length;
         //grid.getColumnConstraints().add(new ColumnConstraints(gridWidth));
         //grid.getRowConstraints().add(new RowConstraints(gridHeight));
 
@@ -58,8 +138,8 @@ public class GridController {
             for (int col = 0; col < colNum; col++) {
                 int n = rand.nextInt(4);
                 Rectangle rec = new Rectangle();
-                rec.setWidth(8);
-                rec.setHeight(8);
+                rec.setWidth(recSize);
+                rec.setHeight(recSize);
 
 //                int val = random.nextInt(max - min + 1) + min;
 
@@ -120,8 +200,10 @@ public class GridController {
         alert.showAndWait();
     }
     @FXML
-    public void doSearch() {
-        System.out.println("Starting search");
+    public void doForwardSearch() {
+        System.out.println("Starting forward search");
+        
+        sortType=SortType.FORWARD;
 
         if (startPos == null || targetPos == null) {
 
@@ -129,16 +211,55 @@ public class GridController {
 
         }
         else {
+        	long startTime=System.currentTimeMillis();
             searchGrid();
+        System.out.println("search time is: "+ (System.currentTimeMillis()-startTime+"milliseconds"));
         }
     }
 
+    @FXML
+    public void doBackwardSearch() {
+        System.out.println("Starting backwards search");
+
+        sortType=SortType.BACKWARD;
+        
+        if (startPos == null || targetPos == null) {
+
+            displayMessage("Missing Input", "Starting and ending position must be selected before searching" );
+            
+        }  
+        else {
+        	long startTime=System.currentTimeMillis();
+            searchGrid();
+        System.out.println("search time is: "+ (System.currentTimeMillis()-startTime+"milliseconds"));
+        }
+    }
+    
+    @FXML
+    public void doAdaptiveSearch() {
+        System.out.println("Starting adaptive search");
+        
+        sortType=SortType.ADAPTIVE;
+
+        if (startPos == null || targetPos == null) {
+
+            displayMessage("Missing Input", "Starting and ending position must be selected before searching" );
+
+        }
+        else {
+        	long startTime=System.currentTimeMillis();
+            searchGrid();
+        System.out.println("search time is: "+ (System.currentTimeMillis()-startTime+"milliseconds"));
+        }
+    }
+    
+    
     @FXML
     public void doRestart() {
         System.out.println("Doing restart");
         startPos = null;
         targetPos = null;
-        routeStack.clear();
+        routeList.clear();
         closedMap.clear();
         openList = new BinaryHeap<>();
         for (int row = 0; row < gridSize; row++) {
@@ -288,64 +409,92 @@ public class GridController {
         }
         return null;
     }
+
     public void searchGrid() {
+        initHvalues();
 
-
-        State start = array[startPos.row][startPos.col];
-
+        start = array[startPos.row][startPos.col];
         State target = array[targetPos.row][targetPos.col];
 
+        
+        if(sortType.equals(SortType.FORWARD)) {
         start.g = 0;
-        target.g = Integer.MAX_VALUE;
+
         start.h = getDistance(targetPos, new Pos(startPos.row, startPos.col));
         start.f = start.g + start.h;
+        }
+        
+        if(sortType.equals(SortType.BACKWARD)) {
+            target.g = 0;
 
-        openList.add(start);
-        Pos currentPos = startPos;
+            target.h = getDistance(targetPos, new Pos(startPos.row, startPos.col));
+            target.f = target.g + target.h;
+            }
 
-        Pos pos = getNextState();
 
         int counter = 0;
-        boolean listIsEmpty = openList.isEmpty();
-        while (!listIsEmpty) {
-            while (!pos.equals(targetPos)) {
 
-                pos = getNextState();
-                if (pos == null) {
-                    System.out.println("Cannot find next position");
-                    break;
-                }
+        while (! start.equals(target)) {
+
+            // add blocked neighbors to map
+
+            addBlockedNeighbors(start);
+
+            counter++;
+            
+            if(sortType.equals(SortType.ADAPTIVE)) {
+            	initializeState(start, counter);
+            	initializeState(target,counter);
             }
-            if (pos != null && pos.equals(targetPos)) {
-                System.out.println("I reached the target");
+            start.g=0;
+            if(sortType.equals(SortType.FORWARD)) {
+            	 start.g = 0;
+            	 target.g = Integer.MAX_VALUE;
+            }
+            if(sortType.equals(SortType.BACKWARD)) {
+           	 target.g = 0;
+           	 start.g = Integer.MAX_VALUE;
+           }
+            start.search = counter;
+            target.search = counter;
+            
+
+            closedMap.clear();
+            routeList.clear();
+            openList = new BinaryHeap<>();
+            if(sortType.equals(sortType.BACKWARD)) {
+            	openList.add(target);
+            }
+            else {
+            	openList.add(start);
+            }
+
+            computePath(counter);
+
+            if (openList.isEmpty()) {
+                displayMessage("No target", "Cannot find target");
                 break;
             }
-            if (!openList.isEmpty()) {
-                State s = openList.peek();
-                System.out.println("Peeked: " + s + " from openList");
-                pos = s.pos;
-            } else {
-                listIsEmpty = true;
+
+            State s=null;
+            
+            if(sortType.equals(SortType.BACKWARD)) {
+                s = array[start.pos.row][start.pos.col];
+                }
+            
+            else{
+            s = array[targetPos.row][targetPos.col];
             }
-        }
-
-        if (openList.isEmpty()) {
-            System.out.println("I cannot reach the target");
-        displayMessage("Target not found", "Target cannot be reached");
-        }
-        else {
-            // go back from goal to target
-
-            State s = array[pos.row][pos.col];
 
             int pathCount = 0;
+            
             while (s.prevPos != null) {
                 System.out.println(s.pos);
-                routeStack.push(s.pos);
+                routeList.add(s.pos);
                 s = array[s.prevPos.row][s.prevPos.col];
                 if (s.pos.equals(start.pos)) {
                     System.out.println(s.pos);
-                    routeStack.push(s.pos);
+                    routeList.add(s.pos);
                     break;
                 }
                 pathCount++;
@@ -354,154 +503,324 @@ public class GridController {
                     break;
                 }
             }
-
-            System.out.println("\nRoute");
-            while (! routeStack.empty()) {
-                pos = routeStack.pop();
-                Rectangle rec1 = (Rectangle) getNodeFromGridPane(pos.row, pos.col);
-
-                if (! pos.equals(startPos) && ! pos.equals(targetPos))
-                rec1.setFill(Color.GREEN);
-                System.out.println(pos);
+            if(sortType.equals(SortType.BACKWARD)) {
+            	routeList.add(s.pos);
             }
+            System.out.println("\nRoute");
+           
+           
+           if(sortType.equals(SortType.BACKWARD)) {
+        	   for(int i=0;i<routeList.size();i++) {
+                   Pos pos = routeList.get(i);
+
+                   if (array[pos.row][pos.col].cellState.equals(State.CellState.BLOCKED))
+                   {
+                       break;
+                   }
+                   System.out.println(pos);
+                   start = array[pos.row][pos.col];
+                   Rectangle rec1 = (Rectangle) getNodeFromGridPane(pos.row, pos.col);
+                       rec1.setFill(Color.GREEN);
+               }
+        	   
+           }
+           
+           else {
+            for(int i=routeList.size()-1;i>=0;i--) {
+                Pos pos = routeList.get(i);
+
+                if (array[pos.row][pos.col].cellState.equals(State.CellState.BLOCKED))
+                {
+                    break;
+                }
+                System.out.println(pos);
+                start = array[pos.row][pos.col];
+                Rectangle rec1 = (Rectangle) getNodeFromGridPane(pos.row, pos.col);
+                    rec1.setFill(Color.GREEN);
+            }
+           }
+           
+           
         }
+
+        System.out.println("I hit the target");
+
     }
 
-    private Pos getNextState() {
+    private void addBlockedNeighbors(State start) {
 
+        Pos currentPos = start.pos;
 
-        if (openList.isEmpty()) {   // should not happen
-            return null;
-        }
-
-        State currentState = openList.remove();
-        Pos currentPos = currentState.pos;
-        System.out.println("Removed: " + currentState + " from openList");
-
-
-        closedMap.put(currentPos, currentState);
-        List<State> stateList = new ArrayList<State>();
-
-        // get col distance
-        int row = currentPos.row, col = currentPos.col;
         int east = currentPos.col + 1;
         int west = currentPos.col - 1;
         int north = currentPos.row - 1;
         int south = currentPos.row + 1;
 
-        int eastDistance = Integer.MAX_VALUE, westDistance = Integer.MAX_VALUE,
-                northDistance = Integer.MAX_VALUE, southDistance = Integer.MAX_VALUE;
-
-        State eastState = null, westState = null, northState = null, southState = null;
-
-        if (isOpen(row, east)) {
-            eastState = array[row][east];
-            eastDistance = getDistance(targetPos, new Pos(row, east));
-            eastState.g = currentState.g + 1; //getDistance(startPos, new Pos(row, east));
-            eastState.h = eastDistance;
-            eastState.f = eastState.g + eastState.h;
-//            eastState.open = true;
-
-            if (targetPos.col > currentPos.col) {
-                eastState.priority++;
-            } else if (east < currentPos.col) {
-                eastState.priority--;
-            }
-            stateList.add(eastState);
-
-            openList.add(eastState);
-//            System.out.println("Setting eastState.prePos to " + currentPos);
-            eastState.prevPos = currentPos;
+        if (isBLockedCell(currentPos.row, east)) {
+            blockedMap.put(new Pos(currentPos.row, east), array[currentPos.row] [east]);
         }
 
-        if (isOpen(row, west)) {
-            westState = array[row][west];
-            westDistance = getDistance(targetPos, new Pos(row, west));
-            westState.g = currentState.g + 1; //getDistance(startPos, new Pos(row, west));
-            westState.h = westDistance;
-//            westState.open = true;
-            westState.f = westState.g + westState.h;
-            if (targetPos.col < currentPos.col) {
-                westState.priority++;
-            } else if (west < currentPos.col) {
-                westState.priority--;
-            }
-            stateList.add(westState);
-            openList.add(westState);
-//            System.out.println("Setting westState.prePos to " + currentPos);
-            westState.prevPos = currentPos;
+        if (isBLockedCell(currentPos.row, west)) {
+            blockedMap.put(new Pos(currentPos.row, west), array[currentPos.row] [west]);
         }
 
-        if (isOpen(south, col)) {
-            southState = array[south][col];
-            southDistance = getDistance(targetPos, new Pos(south, col));
-            southState.g = currentState.g + 1; //getDistance(startPos, new Pos(south, col));
-            southState.h = southDistance;
-//            southState.open = true;
-            southState.f = southState.g + southState.h;
-            if (targetPos.row > currentPos.row) {
-                southState.priority++;
-            } else if (south < currentPos.row) {
-                southState.priority--;
-            }
-            stateList.add(southState);
-            openList.add(southState);
-//            System.out.println("Setting southState.prePos to " + currentPos);
-            southState.prevPos = currentPos;
+        if (isBLockedCell(south, currentPos.col)) {
+            blockedMap.put(new Pos(south, currentPos.col), array[south] [currentPos.col]);
         }
 
-        if (isOpen(north, col)) {
-            northState = array[north][col];
-            northDistance = getDistance(targetPos, new Pos(north, col));
-            northState.g = currentState.g + 1; //getDistance(startPos, new Pos(north, col));
-            northState.h = northDistance;
-//            northState.open = true;
-            northState.f = northState.h + northState.g;
-            if (targetPos.row < currentPos.row) {
-                northState.priority++;
-            } else if (north > currentPos.col) {
-                northState.priority--;
-            }
-
-            stateList.add(northState);
-            openList.add(northState);
-//            System.out.println("Setting northState.prePos to " + currentPos);
-            northState.prevPos = currentPos;
+        if (isBLockedCell(north, currentPos.col)) {
+            blockedMap.put(new Pos(north, currentPos.col), array[north] [currentPos.col]);
         }
-
-
-        // Sort on lowest f, then highest g, then highest priority
-
-//        stateList.sort(Comparator.comparing((State s) -> s.f).thenComparing(s -> s.g).thenComparing(s -> s.priority).reversed());
-        stateList = stateList.stream().sorted(comparing(State::getF).
-                thenComparing(comparing(State::getG).reversed())
-                .thenComparing((comparing(State::getPriority).reversed()))).collect(Collectors.toList());
-        System.out.println(stateList);
-
-        State nextState = null;
-        if (!stateList.isEmpty()) {
-            nextState = stateList.get(0);
-            nextState.g = 0;
-
-//            openList.add(nextState);
-
-            System.out.println("next state " + nextState.pos + "  is open ? " + (nextState.cellState.equals(State.CellState.OPEN)));
-//            System.out.println(openList.toString());
-        }
-
-
-        return (nextState != null) ? nextState.pos : null;
     }
 
-    private boolean isOpen(int row, int col) {
-
+    private boolean isBLockedCell(int row, int col) {
         if (row < 0) return false;
         if (col < 0) return false;
         if (array.length <= row) return false;
         if (array[row].length <= col) return false;
-        if (closedMap.containsKey(new Pos(row, col))) return false;
 
-        return array[row][col].cellState.equals(State.CellState.OPEN);
+        return array[row][col].cellState.equals(State.CellState.BLOCKED);
+    }
+
+
+
+
+    private void initHvalues() {
+        for (int r = 0; r < gridSize; r++) {
+            for (int c = 0; c< gridSize; c++) {
+                State s = array[r][c];
+                s.h = getDistance(targetPos, new Pos(r,c));
+                s.search = 0;
+            }
+        }
+    }
+
+    private void computePath(int counter) {
+    	State targetState=null;
+    	
+    	if(sortType.equals(SortType.BACKWARD)) {
+    			targetState = array[start.pos.row][start.pos.col];
+    	}
+        
+    	else  {
+			targetState = array[targetPos.row][targetPos.col];
+	}
+    		State currentState=null;
+        while (targetState.g > openList.peek().g) {
+
+
+            currentState = openList.remove();
+            Pos currentPos = currentState.pos;
+            System.out.println("Removed: " + currentState + " from openList");
+
+            closedMap.put(currentPos, currentState);
+            List<State> stateList = new ArrayList<State>();
+            
+            // get col distance
+            int row = currentPos.row, col = currentPos.col;
+            int east = currentPos.col + 1;
+            int west = currentPos.col - 1;
+            int north = currentPos.row - 1;
+            int south = currentPos.row + 1;
+
+            int eastDistance = Integer.MAX_VALUE, westDistance = Integer.MAX_VALUE,
+                    northDistance = Integer.MAX_VALUE, southDistance = Integer.MAX_VALUE;
+
+            State eastState = null, westState = null, northState = null, southState = null;
+
+            if (isValidAction(row, east)) {
+                eastState = array[row][east];
+                if(sortType.equals(SortType.ADAPTIVE)) {
+                	initializeState(eastState,counter);
+                }
+                else if (eastState.search < counter) {
+                    eastState.g = Integer.MAX_VALUE;
+                    eastState.search = counter;
+                }
+                if (eastState.g > currentState.g + 1) {
+                    eastState.g = currentState.g + 1;
+                    eastState.prevPos = currentPos;
+
+                    if (! openList.isEmpty() && openList.peek().equals(eastState)) {
+                        State temp = openList.remove();
+                        System.out.println("removing east: " + temp);
+
+                    }
+                    eastDistance = getDistance(targetPos, new Pos(row, east));
+
+                    eastState.h = eastDistance;
+                    eastState.f = eastState.g + eastState.h;
+                    eastState.prevPos = currentPos;
+                    openList.add(eastState);
+
+                }
+
+
+                if (targetPos.col > currentPos.col) {
+                    eastState.priority++;
+                } else if (east < currentPos.col) {
+                    eastState.priority--;
+                }
+                stateList.add(eastState);
+
+            }
+
+            if (isValidAction(row, west)) {
+                westState = array[row][west];
+                if(sortType.equals(SortType.ADAPTIVE)) {
+                	initializeState(westState,counter);
+                }
+                
+                else if (westState.search < counter) {
+                    westState.g = Integer.MAX_VALUE;
+                    westState.search = counter;
+                }
+
+                if (westState.g > currentState.g + 1) {
+                    westState.g = currentState.g + 1;
+                    westState.prevPos = currentPos;
+
+                    if (! openList.isEmpty() && openList.peek().equals(westState)) {
+                        State temp = openList.remove();
+                        System.out.println("removing west: " + temp );
+
+                    }
+
+                    westDistance = getDistance(targetPos, new Pos(row, west));
+
+                    westState.h = westDistance;
+                    westState.f = westState.g + westState.h;
+                    openList.add(westState);
+                    westState.prevPos = currentPos;
+                }
+
+
+                if (targetPos.col < currentPos.col) {
+                    westState.priority++;
+                } else if (west < currentPos.col) {
+                    westState.priority--;
+                }
+                stateList.add(westState);
+
+
+            }
+
+            if (isValidAction(south, col)) {
+                southState = array[south][col];
+                if(sortType.equals(SortType.ADAPTIVE)) {
+                	initializeState(southState,counter);
+                }
+                
+                else if (southState.search < counter) {
+                    southState.g = Integer.MAX_VALUE;
+                    southState.search = counter;
+                }
+
+                if (southState.g > currentState.g + 1) {
+                    southState.g = currentState.g + 1;
+                    southState.search = counter;
+
+                    if (! openList.isEmpty() && openList.peek().equals(southState)) {
+                        State temp = openList.remove();
+                        System.out.println("removing south: " + temp);
+
+                    }
+
+                    southDistance = getDistance(targetPos, new Pos(south, col));
+
+                    southState.h = southDistance;
+                    southState.f = southState.g + southState.h;
+                    openList.add(southState);
+                    southState.prevPos = currentPos;
+                }
+
+
+                if (targetPos.row > currentPos.row) {
+                    southState.priority++;
+                } else if (south < currentPos.row) {
+                    southState.priority--;
+                }
+                stateList.add(southState);
+
+            }
+
+            if (isValidAction(north, col)) {
+                northState = array[north][col];
+                if(sortType.equals(SortType.ADAPTIVE)) {
+                	initializeState(northState,counter);
+                }
+                else if (northState.search < counter) {
+                    northState.g = Integer.MAX_VALUE;
+                    northState.search = counter;
+                }
+
+                if (northState.g > currentState.g + 1) {
+                    northState.g = currentState.g + 1;
+                    northState.search = counter;
+
+
+                    if (! openList.isEmpty() && openList.peek().equals(northState)) {
+                        State temp = openList.remove();
+                        System.out.println("removing north: " + temp);
+
+                    }
+                    northDistance = getDistance(targetPos, new Pos(north, col));
+
+                    northState.h = northDistance;
+                    northState.f = northState.h + northState.g;
+
+                    openList.add(northState);
+                    northState.prevPos = currentPos;
+                }
+
+
+                if (targetPos.row < currentPos.row) {
+                    northState.priority++;
+                } else if (north > currentPos.col) {
+                    northState.priority--;
+                }
+
+                stateList.add(northState);
+
+            }
+
+            if (openList.isEmpty()) {
+                System.out.println("Openlist is empty in compute path, breaking loop");
+                break;
+            }
+        }
+        if(currentState!=null) {
+        newPath=currentState.g;
+        }
+    }
+
+    private void initializeState(State s, int counter) {
+
+        State target = array[targetPos.row][targetPos.col];
+        if (s.search != counter && s.search > 0) {
+            
+            if (s.g + s.h <  newPath) {
+                s.h = newPath - s.g;
+            }
+            s.g = Integer.MAX_VALUE;
+        }
+        else if (s.search == 0) {
+            s.g = Integer.MAX_VALUE;
+            s.h = getDistance(s.pos, target.pos);
+        }
+        
+        s.search = counter;
+    }
+    
+    
+    private boolean isValidAction(int row, int col) {
+        if (row < 0) return false;
+        if (col < 0) return false;
+        if (array.length <= row) return false;
+        if (blockedMap.containsKey(new Pos(row, col))) return false;
+        if (closedMap.containsKey(new Pos(row, col))) return false;
+        if (array[row].length <= col) return false;
+        return true;
     }
 
     private void printGrid(State[][] array) {
@@ -515,5 +834,36 @@ public class GridController {
 
     int getDistance(Pos pos1, Pos pos2) {
         return Math.abs(pos1.row - pos2.row) + Math.abs(pos1.col - pos2.col);
+    }
+
+    public void saveGrid() {
+
+
+        File file = new File("./gridinfo.txt");
+
+        StringBuilder sb = new StringBuilder();
+        if ( !file.exists() || file.length() == 0) {
+            for (int row = 0; row < gridSize; row++) {
+
+                for (int col = 0; col < gridSize; col++) {
+                    State s = array[row][col];
+
+                    if (sb.length() > 0) {
+                        sb.append(":");
+                    }
+                    sb.append(String.valueOf(row)).append(",")
+                            .append(String.valueOf(col)).append(",")
+                            .append((s.cellState.equals(State.CellState.OPEN)) ? "0" : "1");
+
+                }
+
+            }
+            try (PrintStream fileStream = new PrintStream(file)) {
+                fileStream.print(sb.toString());
+            }
+            catch (FileNotFoundException fne) {
+                System.out.println("Failed to save gridinfo file");
+            }
+        }
     }
 }
