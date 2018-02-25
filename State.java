@@ -1,10 +1,19 @@
 package view;
 
+
+
 import java.util.Objects;
 
 class State implements Comparable<State> {
 
-    public enum CellState {UNVISITED, OPEN, BLOCKED}
+    int h;
+    int f;
+    int g;
+    CellState cellState = CellState.UNVISITED;
+    int priority = 0;
+    Pos pos;
+    Pos prevPos;
+    int search = 0;
 
     public State(int g, int h, CellState cellState, Pos pos) {
         this.g = g;
@@ -29,14 +38,6 @@ class State implements Comparable<State> {
         return priority;
     }
 
-    int h;
-    int f;
-    int g;
-    CellState cellState = CellState.UNVISITED;
-    int priority = 0;
-    Pos pos;
-    Pos prevPos;
-
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -53,7 +54,13 @@ class State implements Comparable<State> {
 
     @Override
     public int compareTo(State that) {
-        return this.f - that.f;
+
+        int result = this.f - that.f;
+
+        if (result == 0 )  {
+            result = that.g - this.g;
+        }
+        return result;
     }
 
     @Override
@@ -65,6 +72,10 @@ class State implements Comparable<State> {
                 ", cellState=" + cellState +
                 ", priority=" + priority +
                 ", pos=" + pos +
+                ", prevPos=" + prevPos +
+                ", search=" + search +
                 '}';
     }
+
+    public enum CellState {UNVISITED, OPEN, BLOCKED}
 }
