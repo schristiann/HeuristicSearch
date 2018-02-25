@@ -23,6 +23,7 @@ public class GridTest extends Application {
                 getClass().getResource("/view/grid.fxml"));
         AnchorPane root = loader.load();
         GridController gridController = loader.getController();
+        //sets the size of the grid
         gridController.makeGrid(101);
 
         Scene scene = new Scene(root, 1000, 600);
