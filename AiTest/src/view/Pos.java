@@ -1,5 +1,9 @@
 package view;
 
+/*
+ * Sam Christian and Brad Mitchell
+ */
+
 import java.util.Objects;
 
 class Pos {

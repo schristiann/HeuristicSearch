@@ -1,5 +1,9 @@
 package view;
 
+/*
+ * Sam Christian and Brad Mitchell
+ */
+
 import javafx.event.EventHandler;
 import javafx.fxml.FXML;
 import javafx.scene.Node;

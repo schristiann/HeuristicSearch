@@ -1,5 +1,9 @@
 package app;
 
+/*
+ * Sam Christian and Brad Mitchell
+ */
+
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Scene;

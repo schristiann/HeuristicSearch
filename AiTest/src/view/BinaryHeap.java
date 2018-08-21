@@ -1,6 +1,10 @@
+package view;
+
+/*
+ * Sam Christian and Brad Mitchell
+ */
 
 import java.util.Arrays;
-import java.util.PriorityQueue;
 
 public class BinaryHeap<T extends Comparable<T>> {
     private static final int DEFAULT_CAPACITY = 10;
@@ -11,7 +15,7 @@ public class BinaryHeap<T extends Comparable<T>> {
      * Constructs a new BinaryHeap.
      */
     @SuppressWarnings("unchecked")
-    public BinaryHeap () {
+    public BinaryHeap() {
         // Java doesn't allow construction of arrays of placeholder data types
         array = (T[])new Comparable[DEFAULT_CAPACITY];
         size = 0;
@@ -105,7 +109,7 @@ public class BinaryHeap<T extends Comparable<T>> {
             if (array[index].compareTo(array[smallerChild]) > 0) {
                 swap(index, smallerChild);
             } else {
-                
+                // otherwise, get outta here!
                 break;
             }
 
